@@ -18,8 +18,12 @@ jobs:
       max-parallel: 2
       matrix:
         include:
-          - candidate: background-806
-            sha: a8d272770d58ce971a97626593c0b70adb0322d5
+          - candidate: baseline-172656a
+            sha: 172656ab38a4ff666f88dc9032fa841834a69495
+            expected: 1765
+          - candidate: background-806-v2
+            sha: 22dd48a976a06cf8b2bf778ea69f11509eac5002
+            expected: 1777
     steps:
       - name: Checkout exact candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -54,7 +58,7 @@ jobs:
       - name: Record structured test results
         if: ${{ !cancelled() }}
         run: |
-          python -c 'import os, pathlib, xml.etree.ElementTree as E, json, hashlib; p=pathlib.Path(os.environ["RUNNER_TEMP"])/"full-tests.xml"; b=p.read_bytes(); r=E.fromstring(b); print("JUNIT_SHA256",hashlib.sha256(b).hexdigest()); print("JUNIT_ROOT",r.attrib); print("JUNIT_CASES",json.dumps([{**t.attrib,"outcomes":[x.tag for x in t]} for t in r.iter("testcase")])); print("JUNIT_SUITES",json.dumps([t.attrib for t in r.iter("testsuite")]))'
+          python -c 'import os, pathlib, xml.etree.ElementTree as E, json, hashlib; p=pathlib.Path(os.environ["RUNNER_TEMP"])/"full-tests.xml"; b=p.read_bytes(); r=E.fromstring(b); print("JUNIT_SHA256",hashlib.sha256(b).hexdigest()); print("JUNIT_ROOT",r.attrib); print("JUNIT_CASES",json.dumps([{**t.attrib,"outcomes":[x.tag for x in t]} for t in r.iter("testcase")])); print("JUNIT_SUITES",json.dumps([t.attrib for t in r.iter("testsuite")])); assert len(list(r.iter("testcase"))) == ${{ matrix.expected }}, "Incomplete testcase inventory"'
       - name: Notice tests
         if: ${{ !cancelled() }}
         run: npm run test:notices:no-build
