@@ -39,7 +39,7 @@ const FILTERABLE_RESOURCE_TYPES: readonly [
 export const listNetworkRequests: PageToolFactory = definePageTool(
   (args: ParsedArguments) => ({
     name: 'list_network_requests',
-    description: `Lists the most recent requests for the target page since the last navigation.`,
+    description: `Lists the most recent requests for the target page since the last navigation. WebSocket connections are not included.`,
     annotations: {
       category: ToolCategory.NETWORK,
       readOnlyHint: true,

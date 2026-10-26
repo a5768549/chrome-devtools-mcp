@@ -1412,7 +1412,7 @@ export const commands: Commands = {
   },
   list_network_requests: {
     description:
-      'Lists the most recent requests for the target page since the last navigation.',
+      'Lists the most recent requests for the target page since the last navigation. WebSocket connections are not included.',
     category: 'Network',
     args: {
       pageId: {

@@ -366,7 +366,7 @@
 
 ### `list_network_requests`
 
-**Description:** Lists the most recent requests for the target page since the last navigation.
+**Description:** Lists the most recent requests for the target page since the last navigation. WebSocket connections are not included.
 
 **Parameters:**
 
