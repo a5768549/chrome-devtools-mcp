@@ -47,10 +47,14 @@ jobs:
         env:
           NODE_OPTIONS: --max_old_space_size=4096
       - name: Full test suite
-        run: npm run test -- --test-concurrency=1
+        run: npm run test -- --test-concurrency=1 --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination="$RUNNER_TEMP/full-tests.xml"
         env:
           LANG: en_US.UTF-8
           LC_ALL: en_US.UTF-8
+      - name: Record structured test results
+        if: ${{ !cancelled() }}
+        run: |
+          python -c 'import os, pathlib, xml.etree.ElementTree as E, json, hashlib; p=pathlib.Path(os.environ["RUNNER_TEMP"])/"full-tests.xml"; b=p.read_bytes(); r=E.fromstring(b); print("JUNIT_SHA256",hashlib.sha256(b).hexdigest()); print("JUNIT_ROOT",r.attrib); print("JUNIT_CASES",json.dumps([{**t.attrib,"outcomes":[x.tag for x in t]} for t in r.iter("testcase")])); print("JUNIT_SUITES",json.dumps([t.attrib for t in r.iter("testsuite")]))'
       - name: Notice tests
         if: ${{ !cancelled() }}
         run: npm run test:notices:no-build
