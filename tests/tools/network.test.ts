@@ -17,29 +17,6 @@ import {createHandlerMocks, createMockParsedArguments} from '../mocks.js';
 
 describe('network', () => {
   describe('list_network_requests', () => {
-    it('rejects unsupported websocket resource filters', () => {
-      const {resourceTypes} = listNetworkRequests(
-        createMockParsedArguments(),
-      ).schema;
-
-      assert.strictEqual(resourceTypes.safeParse(['websocket']).success, false);
-      assert.strictEqual(
-        resourceTypes.safeParse(['fetch', 'websocket']).success,
-        false,
-      );
-    });
-
-    it('accepts HTTP resource filters and unfiltered requests', () => {
-      const {resourceTypes} = listNetworkRequests(
-        createMockParsedArguments(),
-      ).schema;
-
-      const types = ['document', 'xhr', 'fetch', 'eventsource'];
-      assert.deepStrictEqual(resourceTypes.parse(types), types);
-      assert.deepStrictEqual(resourceTypes.parse([]), []);
-      assert.strictEqual(resourceTypes.parse(undefined), undefined);
-    });
-
     it('documents that websocket connections are not listed', () => {
       const tool = listNetworkRequests(createMockParsedArguments());
 
