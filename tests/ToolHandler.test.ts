@@ -1787,7 +1787,7 @@ describe('ToolHandler', () => {
     const mockProcess = sinon.createStubInstance(ChildProcess);
     mockContext.ensureBrowser.resolves(getMockBrowser({process: mockProcess}));
     mockContext.getDevToolsData.resolves({});
-    const mockPage = sinon.createStubInstance(McpPage);
+    const mockPage = createMockMcpPage();
     mockPage.getDialog.returns(undefined);
     sinon.stub(mockPage, 'networkConditions').get(() => undefined);
     sinon.stub(mockPage, 'geolocation').get(() => undefined);
@@ -1814,7 +1814,7 @@ describe('ToolHandler', () => {
       filePath: inputPath,
     });
 
-    assert.strictEqual(result.isError, undefined);
+    assert.strictEqual(result.isError, undefined, JSON.stringify(result));
     assert.strictEqual(
       mockContext.validatePath.calledOnceWith(inputPath),
       true,
