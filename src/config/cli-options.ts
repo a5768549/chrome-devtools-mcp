@@ -392,6 +392,14 @@ export const commands: Commands = {
         required: false,
         positional: false,
       },
+      backgroundColor: {
+        name: 'backgroundColor',
+        type: 'string',
+        description:
+          'Opaque default page background in #RRGGBB format. Does not override CSS backgrounds. Chrome internal pages may ignore it. Persists across navigation; omit to clear a previously configured override.',
+        required: false,
+        positional: false,
+      },
       colorScheme: {
         name: 'colorScheme',
         type: 'string',

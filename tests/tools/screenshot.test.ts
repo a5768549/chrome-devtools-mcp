@@ -37,6 +37,129 @@ function pngHeight(data: Buffer): number {
 }
 
 describe('screenshot', () => {
+  it('preserves the emulated default background across capture paths and cleanup', async () => {
+    await withMcpContext(async (response, context, args) => {
+      const page = context.getSelectedMcpPage();
+      const pptrPage = page.pptrPage;
+      await pptrPage.goto(
+        'data:text/html,' +
+          encodeURIComponent(
+            html`<!doctype html>
+              <style>
+                html,
+                body {
+                  margin: 0;
+                  background: transparent;
+                }
+                canvas {
+                  display: block;
+                }</style
+              ><canvas
+                aria-label="transparent canvas"
+                width="80"
+                height="80"
+              ></canvas>`,
+          ),
+      );
+      async function pixel(data: Uint8Array): Promise<number[]> {
+        return await pptrPage.evaluate(async data => {
+          const image = new Image();
+          image.src = `data:image/png;base64,${data}`;
+          await image.decode();
+          const canvas = document.createElement('canvas');
+          canvas.width = image.width;
+          canvas.height = image.height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            throw new Error('Missing 2D context');
+          }
+          ctx.drawImage(image, 0, 0);
+          return [...ctx.getImageData(0, 0, 1, 1).data];
+        }, Buffer.from(data).toString('base64'));
+      }
+      const baseline = await pixel(await pptrPage.screenshot());
+      await page.emulate({backgroundColor: '#123456'});
+      page.textSnapshot = await TextSnapshot.create(page);
+      const node = [...page.textSnapshot.idToNode.values()].find(
+        node => node.name === 'transparent canvas',
+      );
+      assert.ok(node);
+      for (const params of [
+        {format: 'png'},
+        {format: 'png', fullPage: true},
+        {format: 'png', uid: node.id},
+      ]) {
+        await screenshot(args).handler({params, page}, response, context);
+        const image = response.images.at(-1);
+        assert.ok(image);
+        assert.deepStrictEqual(
+          await pixel(Buffer.from(image.data, 'base64')),
+          [18, 52, 86, 255],
+          JSON.stringify(params),
+        );
+      }
+      await screenshot({...args, screenshotMaxWidth: 40}).handler(
+        {params: {format: 'png'}, page},
+        response,
+        context,
+      );
+      const clipped = response.images.at(-1);
+      assert.ok(clipped);
+      assert.deepStrictEqual(
+        await pixel(Buffer.from(clipped.data, 'base64')),
+        [18, 52, 86, 255],
+      );
+      await assert.rejects(
+        screenshot(args).handler(
+          {params: {format: 'png', uid: 'missing'}, page},
+          response,
+          context,
+        ),
+      );
+      assert.deepStrictEqual(
+        await pixel(await pptrPage.screenshot()),
+        [18, 52, 86, 255],
+      );
+      await pptrPage.evaluate(() => {
+        document.documentElement.style.background = '#abcdef';
+      });
+      assert.deepStrictEqual(
+        await pixel(await pptrPage.screenshot()),
+        [171, 205, 239, 255],
+      );
+      await pptrPage.evaluate(() => {
+        document.documentElement.style.background = 'transparent';
+      });
+      const interferingSession = await pptrPage.createCDPSession();
+      await interferingSession.send(
+        'Emulation.setDefaultBackgroundColorOverride',
+        {color: {r: 0, g: 0, b: 0, a: 1}},
+      );
+      await interferingSession.detach();
+      await page.restoreEmulation();
+      assert.deepStrictEqual(
+        await pixel(await pptrPage.screenshot()),
+        [18, 52, 86, 255],
+      );
+      await page.emulate({});
+      assert.deepStrictEqual(
+        await pixel(await pptrPage.screenshot()),
+        baseline,
+      );
+      await page.emulate({backgroundColor: '#123456'});
+      const owner = page.devtoolsUniverse?.session;
+      assert.ok(owner);
+      const detach = sinon.spy(owner, 'detach');
+      page.dispose();
+      sinon.assert.calledOnceWithExactly(detach);
+      await detach.firstCall.returnValue;
+      assert.deepStrictEqual(
+        await pixel(await pptrPage.screenshot()),
+        baseline,
+      );
+    });
+  });
+
   describe('downscale clip', () => {
     for (const viewport of [{width: 800, height: 600}, null]) {
       const mode = viewport ? 'emulated viewport' : 'native viewport';

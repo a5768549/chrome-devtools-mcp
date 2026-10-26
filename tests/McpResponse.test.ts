@@ -499,6 +499,31 @@ describe('McpResponse', () => {
     });
   });
 
+  it('reports only the configured background in text and structured output', async () => {
+    const {page, context} = createHandlerMocks();
+    const response = new McpResponse(createMockServerConfig());
+    response.setPage(page);
+    page.emulationSettings = {backgroundColor: '#123456'};
+    const configured = await response.handle(context);
+    assert.match(
+      getTextContent(configured.content[0]),
+      /Emulating default background color: #123456/,
+    );
+    assert.ok(
+      configured.structuredContent &&
+        'backgroundColor' in configured.structuredContent,
+    );
+    assert.strictEqual(configured.structuredContent.backgroundColor, '#123456');
+    page.emulationSettings = {};
+    const cleared = await response.handle(context);
+    assert.doesNotMatch(
+      getTextContent(cleared.content[0]),
+      /default background color/,
+    );
+    assert.ok(cleared.structuredContent);
+    assert.strictEqual('backgroundColor' in cleared.structuredContent, false);
+  });
+
   it('adds color scheme emulation setting when it is set', async t => {
     await withMcpContext(async (response, context) => {
       await context.getSelectedMcpPage().emulate({colorScheme: 'dark'});

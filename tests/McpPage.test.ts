@@ -634,6 +634,103 @@ describe('McpPage', () => {
   });
 
   describe('emulate()', () => {
+    it('sets an opaque default background on the existing session', async () => {
+      const {mcpPage, mockSession} = await createMcpPage();
+      const options = {backgroundColor: '#1234Ab', colorScheme: 'auto'};
+      await mcpPage.emulate({...options, colorScheme: 'auto'});
+      sinon.assert.calledWithExactly(
+        mockSession.send,
+        'Emulation.setDefaultBackgroundColorOverride',
+        {color: {r: 18, g: 52, b: 171, a: 1}},
+      );
+      assert.deepStrictEqual(mcpPage.emulationSettings, {
+        backgroundColor: '#1234Ab',
+      });
+    });
+
+    it('resets the previous background when omitted', async () => {
+      const {mcpPage, mockSession} = await createMcpPage();
+      await mcpPage.emulate({backgroundColor: '#123456'});
+      mockSession.send.resetHistory();
+      await mcpPage.emulate({});
+      sinon.assert.calledWithExactly(
+        mockSession.send,
+        'Emulation.setDefaultBackgroundColorOverride',
+        {},
+      );
+      assert.deepStrictEqual(mcpPage.emulationSettings, {});
+    });
+
+    it('leaves an unconfigured background untouched', async () => {
+      const {mcpPage, mockSession} = await createMcpPage();
+      await mcpPage.emulate({});
+      sinon.assert.neverCalledWith(
+        mockSession.send,
+        'Emulation.setDefaultBackgroundColorOverride',
+      );
+    });
+
+    for (const backgroundColor of ['#abcdef', undefined]) {
+      it(`preserves background state when sending ${backgroundColor} fails`, async () => {
+        const {mcpPage, mockSession} = await createMcpPage();
+        await mcpPage.emulate({backgroundColor: '#123456'});
+        mockSession.send
+          .withArgs('Emulation.setDefaultBackgroundColorOverride')
+          .rejects(new Error('CDP failure'));
+        await assert.rejects(mcpPage.emulate({backgroundColor}), /CDP failure/);
+        assert.strictEqual(
+          mcpPage.emulationSettings.backgroundColor,
+          '#123456',
+        );
+      });
+    }
+
+    it('restores the configured background', async () => {
+      const {mcpPage, mockSession} = await createMcpPage();
+      await mcpPage.emulate({backgroundColor: '#123456'});
+      mockSession.send.resetHistory();
+      await mcpPage.restoreEmulation();
+      sinon.assert.calledWithExactly(
+        mockSession.send,
+        'Emulation.setDefaultBackgroundColorOverride',
+        {color: {r: 18, g: 52, b: 86, a: 1}},
+      );
+    });
+
+    it('does not record background success after disposal during send', async () => {
+      const {mcpPage, mockSession} = await createMcpPage();
+      mockSession.send
+        .withArgs('Emulation.setDefaultBackgroundColorOverride')
+        .callsFake(async () => mcpPage.dispose());
+      await assert.rejects(
+        mcpPage.emulate({backgroundColor: '#123456'}),
+        /disposed/,
+      );
+      assert.strictEqual(mcpPage.emulationSettings.backgroundColor, undefined);
+    });
+
+    it('requires a session to set or reset a background', async () => {
+      const pptrPage = createMockPuppeteerPage();
+      const mcpPage = new McpPage(
+        createMockPuppeteerTarget({page: pptrPage}),
+        1,
+        {
+          config: createMockServerConfig(),
+          locatorClass: Locator,
+        },
+      );
+      sinon.stub(mcpPage, 'devtoolsUniverse').get(() => undefined);
+      await mcpPage.init();
+      await mcpPage.emulate({});
+      await assert.rejects(
+        mcpPage.emulate({backgroundColor: '#123456'}),
+        /requires a DevTools session/,
+      );
+      mcpPage.emulationSettings = {backgroundColor: '#123456'};
+      await assert.rejects(mcpPage.emulate({}), /requires a DevTools session/);
+      assert.strictEqual(mcpPage.emulationSettings.backgroundColor, '#123456');
+    });
+
     it('calls emulateNetworkConditions with offline settings', async () => {
       const {mcpPage, pptrPage} = await createMcpPage();
       await mcpPage.emulate({networkConditions: 'Offline'});

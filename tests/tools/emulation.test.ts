@@ -152,6 +152,38 @@ describe('emulation', () => {
     });
   });
 
+  describe('background color', () => {
+    it('validates and forwards an opaque hex background', async () => {
+      const {page, context, response, args} = createHandlerMocks();
+      const tool = emulate(args);
+      const {pageId, ...params} = zod
+        .object(tool.schema)
+        .parse({pageId: 1, backgroundColor: '#12abEF'});
+      assert.strictEqual(pageId, 1);
+      await tool.handler({params, page}, response, context);
+      sinon.assert.calledOnceWithExactly(page.emulate, {
+        backgroundColor: '#12abEF',
+      });
+    });
+
+    it('rejects unsupported background strings in the schema', () => {
+      const {args} = createHandlerMocks();
+      const schema = zod.object(emulate(args).schema);
+      for (const backgroundColor of [
+        'red',
+        '#abc',
+        '#12345678',
+        '#gg0000',
+        ' #123456',
+        '',
+        '#123456\n',
+        '#123456\r\n',
+      ]) {
+        assert.throws(() => schema.parse({pageId: 1, backgroundColor}));
+      }
+    });
+  });
+
   describe('network', () => {
     it('emulates offline network conditions', async () => {
       const {page, context, response, args} = createHandlerMocks();

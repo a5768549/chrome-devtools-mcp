@@ -1353,6 +1353,7 @@ export class McpPage implements ContextPage {
     cpuThrottlingRate?: number;
     geolocation?: GeolocationOptions;
     userAgent?: string;
+    backgroundColor?: string;
     colorScheme?: 'dark' | 'light' | 'auto';
     forcedColors?: ForcedColors | 'auto';
     prefersContrast?: PrefersContrast | 'auto';
@@ -1493,6 +1494,39 @@ export class McpPage implements ContextPage {
         ? newSettings
         : {};
       throw error;
+    }
+
+    if (
+      options.backgroundColor !== undefined ||
+      this.emulationSettings.backgroundColor !== undefined
+    ) {
+      if (!secondarySession) {
+        throw new Error(
+          'Background color emulation requires a DevTools session.',
+        );
+      }
+      const color = options.backgroundColor;
+      await secondarySession.send(
+        'Emulation.setDefaultBackgroundColorOverride',
+        color === undefined
+          ? {}
+          : {
+              color: {
+                r: parseInt(color.slice(1, 3), 16),
+                g: parseInt(color.slice(3, 5), 16),
+                b: parseInt(color.slice(5, 7), 16),
+                a: 1,
+              },
+            },
+      );
+      if (this.#disposed) {
+        throw new Error('Page was disposed during background color emulation.');
+      }
+      if (color === undefined) {
+        delete this.emulationSettings.backgroundColor;
+      } else {
+        this.emulationSettings.backgroundColor = color;
+      }
     }
   }
 
