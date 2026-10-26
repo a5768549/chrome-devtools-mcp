@@ -153,7 +153,8 @@ export const screenshot: PageToolFactory = definePageTool(
 
     return {
       name: 'take_screenshot',
-      description: `Take a screenshot of the page or element.`,
+      description:
+        'Take a screenshot of the page or element. PNG and WebP preserve transparency where no CSS background is painted; JPEG uses the browser default opaque background. CSS backgrounds are not removed or inferred.',
       annotations: {
         category: ToolCategory.DEBUGGING,
         // Not read-only due to filePath param.
@@ -258,6 +259,7 @@ export const screenshot: PageToolFactory = definePageTool(
             type: format,
             quality,
             optimizeForSpeed: true,
+            omitBackground: format !== 'jpeg',
             clip,
           });
         } else if (element) {
@@ -265,6 +267,7 @@ export const screenshot: PageToolFactory = definePageTool(
             type: format,
             quality,
             optimizeForSpeed: true,
+            omitBackground: format !== 'jpeg',
           });
         } else {
           screenshot = await page.screenshot({
@@ -272,6 +275,7 @@ export const screenshot: PageToolFactory = definePageTool(
             fullPage,
             quality,
             optimizeForSpeed: true,
+            omitBackground: format !== 'jpeg',
           });
         }
 

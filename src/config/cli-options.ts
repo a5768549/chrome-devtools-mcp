@@ -1921,7 +1921,8 @@ export const commands: Commands = {
     },
   },
   take_screenshot: {
-    description: 'Take a screenshot of the page or element.',
+    description:
+      'Take a screenshot of the page or element. PNG and WebP preserve transparency where no CSS background is painted; JPEG uses the browser default opaque background. CSS backgrounds are not removed or inferred.',
     category: 'Debugging',
     args: {
       pageId: {

@@ -37,6 +37,67 @@ function pngHeight(data: Buffer): number {
 }
 
 describe('screenshot', () => {
+  describe('background compositing', () => {
+    const formats: Array<'png' | 'webp' | 'jpeg'> = ['png', 'webp', 'jpeg'];
+    for (const format of formats) {
+      for (const mode of ['viewport', 'fullPage', 'element', 'clip']) {
+        it(`preserves supported alpha for ${format} ${mode} screenshots`, async () => {
+          const {page, context, response, args} = createHandlerMocks(
+            mode === 'clip' ? {screenshotMaxWidth: 100} : {},
+          );
+          const pptrPage = page.pptrPage;
+          const {handle} = createMockElementHandle();
+          page.getElementByUid.resolves(handle);
+          pptrPage.viewport.returns({width: 200, height: 100});
+          pptrPage.evaluate.resolves({
+            x: 0,
+            y: 0,
+            width: 200,
+            height: 100,
+            devicePixelRatio: 1,
+          });
+          pptrPage.screenshot.resolves(new Uint8Array([1, 2, 3]));
+          handle.screenshot.resolves(new Uint8Array([1, 2, 3]));
+
+          await screenshot(args).handler(
+            {
+              params: {
+                format,
+                fullPage: mode === 'fullPage',
+                uid: mode === 'element' ? '1_1' : undefined,
+              },
+              page,
+            },
+            response,
+            context,
+          );
+
+          const options = {
+            type: format,
+            quality: undefined,
+            optimizeForSpeed: true,
+            omitBackground: format !== 'jpeg',
+          };
+          if (mode === 'element') {
+            sinon.assert.calledOnceWithExactly(handle.screenshot, options);
+            sinon.assert.notCalled(pptrPage.screenshot);
+          } else {
+            sinon.assert.calledOnceWithExactly(pptrPage.screenshot, {
+              ...options,
+              ...(mode === 'clip'
+                ? {clip: {x: 0, y: 0, width: 200, height: 100, scale: 0.5}}
+                : {fullPage: mode === 'fullPage'}),
+            });
+            sinon.assert.notCalled(handle.screenshot);
+          }
+          sinon.assert.calledOnceWithExactly(response.attachImage, {
+            mimeType: `image/${format}`,
+            data: 'AQID',
+          });
+        });
+      }
+    }
+  });
   describe('downscale clip', () => {
     for (const viewport of [{width: 800, height: 600}, null]) {
       const mode = viewport ? 'emulated viewport' : 'native viewport';
@@ -66,6 +127,7 @@ describe('screenshot', () => {
           type: 'png',
           quality: undefined,
           optimizeForSpeed: true,
+          omitBackground: true,
           clip: {
             x: 800,
             y: 1000,
@@ -99,6 +161,7 @@ describe('screenshot', () => {
           type: 'png',
           quality: undefined,
           optimizeForSpeed: true,
+          omitBackground: true,
           clip: {
             x: 920,
             y: 1080,
@@ -133,6 +196,7 @@ describe('screenshot', () => {
         type: 'png',
         quality: undefined,
         optimizeForSpeed: true,
+        omitBackground: true,
         clip: {x: 0, y: 0, width: 1600, height: 2000, scale: 0.0625},
       });
     });
@@ -159,6 +223,7 @@ describe('screenshot', () => {
         type: 'png',
         quality: undefined,
         optimizeForSpeed: true,
+        omitBackground: true,
       });
     });
 
@@ -208,6 +273,58 @@ describe('screenshot', () => {
   });
 
   describe('browser_take_screenshot', () => {
+    it('preserves transparent canvas pixels and painted CSS backgrounds', async () => {
+      await withMcpContext(async (response, context) => {
+        const page = context.getSelectedMcpPage().pptrPage;
+        await page.setViewport({width: 100, height: 100});
+        await page.setContent(
+          html`<style>
+              body {
+                margin: 0;
+              }
+              div {
+                background: rgb(15, 23, 42);
+                width: 50px;
+                height: 50px;
+              }
+            </style>
+            <div
+              ><canvas
+                width="50"
+                height="50"
+              ></canvas
+            ></div>`,
+        );
+
+        await screenshotTool.handler(
+          {params: {format: 'png'}, page: context.getSelectedMcpPage()},
+          response,
+          context,
+        );
+
+        const pixels = await page.evaluate(async data => {
+          const image = new Image();
+          image.src = `data:image/png;base64,${data}`;
+          await image.decode();
+          const canvas = document.createElement('canvas');
+          canvas.width = image.width;
+          canvas.height = image.height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            throw new Error('Canvas context unavailable');
+          }
+          ctx.drawImage(image, 0, 0);
+          return {
+            painted: Array.from(ctx.getImageData(25, 25, 1, 1).data),
+            transparent: Array.from(ctx.getImageData(75, 75, 1, 1).data),
+          };
+        }, response.images[0].data);
+        assert.deepStrictEqual(pixels, {
+          painted: [15, 23, 42, 255],
+          transparent: [0, 0, 0, 0],
+        });
+      });
+    });
     it('with default options', async () => {
       await withMcpContext(async (response, context) => {
         const fixture = screenshots.basic;
@@ -242,6 +359,7 @@ describe('screenshot', () => {
         fullPage: false,
         quality: undefined,
         optimizeForSpeed: true,
+        omitBackground: true,
       });
       sinon.assert.calledOnceWithExactly(
         response.appendResponseLine,
@@ -267,6 +385,7 @@ describe('screenshot', () => {
         fullPage: false,
         quality: undefined,
         optimizeForSpeed: true,
+        omitBackground: false,
       });
       sinon.assert.calledOnceWithExactly(
         response.appendResponseLine,
@@ -292,6 +411,7 @@ describe('screenshot', () => {
         fullPage: false,
         quality: 50,
         optimizeForSpeed: true,
+        omitBackground: false,
       });
     });
     it('with webp', async () => {
@@ -311,6 +431,7 @@ describe('screenshot', () => {
         fullPage: false,
         quality: 80,
         optimizeForSpeed: true,
+        omitBackground: true,
       });
       sinon.assert.calledOnceWithExactly(
         response.appendResponseLine,
@@ -428,6 +549,7 @@ describe('screenshot', () => {
         type: 'png',
         quality: undefined,
         optimizeForSpeed: true,
+        omitBackground: true,
       });
       sinon.assert.notCalled(page.pptrPage.screenshot);
       sinon.assert.calledOnceWithExactly(handle.dispose);

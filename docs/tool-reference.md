@@ -480,7 +480,7 @@ Results are paginated (10 rules per page by default); use pageIdx to page throug
 
 ### `take_screenshot`
 
-**Description:** Take a screenshot of the page or element.
+**Description:** Take a screenshot of the page or element. PNG and WebP preserve transparency where no CSS background is painted; JPEG uses the browser default opaque background. CSS backgrounds are not removed or inferred.
 
 **Parameters:**
 
