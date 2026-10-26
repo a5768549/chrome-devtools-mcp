@@ -656,8 +656,40 @@ describe('browser', () => {
       });
     });
 
+    it('keeps wrapped connection errors distinct from missing DevToolsActivePort', async () => {
+      const connectionError = Object.assign(
+        new Error('connect ECONNREFUSED 127.0.0.1:9222'),
+        {code: 'ECONNREFUSED'},
+      );
+      const puppeteerError = new Error(
+        'Could not find DevToolsActivePort for chrome at /test/DevToolsActivePort',
+        {cause: connectionError},
+      );
+      sinon.stub(puppeteer, 'connect').rejects(puppeteerError);
+      const manager = new BrowserManager(
+        createMockServerConfig({autoConnect: true, channel: 'stable'}),
+      );
+
+      await assert.rejects(manager.ensureBrowser(), err => {
+        assert.ok(err instanceof Error);
+        assert.strictEqual(
+          err.message,
+          'Could not connect to Chrome. ' +
+            'Check if Chrome is running and remote debugging is enabled by ' +
+            'going to chrome://inspect/#remote-debugging. ' +
+            'If you are using Chromium or a custom user data directory, pass ' +
+            '--userDataDir with the directory containing DevToolsActivePort. ' +
+            'To launch a browser at a custom executable path instead, use ' +
+            '--executablePath (-e) without --autoConnect.',
+        );
+        assert.strictEqual(err.cause, puppeteerError);
+        assert.strictEqual(puppeteerError.cause, connectionError);
+        return true;
+      });
+    });
+
     for (const autoConnect of [true, false]) {
-      it(`does not suggest custom browser paths for unrelated connection errors (autoConnect=${autoConnect})`, async () => {
+      it(`limits conditional custom browser hints to auto-connect failures (autoConnect=${autoConnect})`, async () => {
         const error = new Error('Connection refused');
         sinon.stub(puppeteer, 'connect').rejects(error);
         const manager = new BrowserManager(
@@ -675,7 +707,11 @@ describe('browser', () => {
             'Could not connect to Chrome. ' +
               (autoConnect
                 ? 'Check if Chrome is running and remote debugging is enabled ' +
-                  'by going to chrome://inspect/#remote-debugging.'
+                  'by going to chrome://inspect/#remote-debugging. ' +
+                  'If you are using Chromium or a custom user data directory, pass ' +
+                  '--userDataDir with the directory containing DevToolsActivePort. ' +
+                  'To launch a browser at a custom executable path instead, use ' +
+                  '--executablePath (-e) without --autoConnect.'
                 : 'Check if Chrome is running.'),
           );
           assert.strictEqual(err.cause, error);
@@ -737,15 +773,15 @@ describe('browser', () => {
         assert.strictEqual(
           err.message,
           'Could not connect to Chrome. ' +
-            `${puppeteerError.message}. ` +
             'Check if Chrome is running and remote debugging is enabled by ' +
             'going to chrome://inspect/#remote-debugging. ' +
-            'For Chromium or a custom user data directory, pass ' +
+            'If you are using Chromium or a custom user data directory, pass ' +
             '--userDataDir with the directory containing DevToolsActivePort. ' +
             'To launch a browser at a custom executable path instead, use ' +
             '--executablePath (-e) without --autoConnect.',
         );
         assert.strictEqual(err.cause, puppeteerError);
+        assert.strictEqual(puppeteerError.cause, enoentError);
         return true;
       });
     });
