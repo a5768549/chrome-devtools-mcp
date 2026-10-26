@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   verify:
-    name: ${{ matrix.candidate }} / Linux Node 24
+    name: ${{ matrix.candidate }} / Linux Node 22
     runs-on: ubuntu-latest
     timeout-minutes: 25
     strategy:
@@ -18,6 +18,12 @@ jobs:
       max-parallel: 3
       matrix:
         include:
+          - candidate: baseline
+            sha: ada7963246c0c91eae185125a57aecd13cbe0376
+          - candidate: wait-2947
+            sha: e9339e252e225fcb48d58ed806b7735034235f49
+          - candidate: fill-2942
+            sha: 5e68bd1d6f72760bc7fc1a5f99dc0ed313bfbc05
           - candidate: network-2961
             sha: 6112ab8a9edf5c7bfdff29df4c185fe8f5c34eb8
     steps:
@@ -31,7 +37,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
-          node-version: 24
+          node-version: 22
       - name: Record provenance
         run: |
           git rev-parse HEAD
@@ -47,7 +53,7 @@ jobs:
         env:
           NODE_OPTIONS: --max_old_space_size=4096
       - name: Full test suite
-        run: npm run test -- --test-concurrency=2
+        run: npm run test -- --test-concurrency=1
         env:
           LANG: en_US.UTF-8
           LC_ALL: en_US.UTF-8
