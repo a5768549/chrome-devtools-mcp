@@ -18,8 +18,8 @@ jobs:
       max-parallel: 2
       matrix:
         include:
-          - candidate: baseline-172656a
-            sha: 172656ab38a4ff666f88dc9032fa841834a69495
+          - candidate: background-806
+            sha: a8d272770d58ce971a97626593c0b70adb0322d5
     steps:
       - name: Checkout exact candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
