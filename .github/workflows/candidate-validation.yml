@@ -18,14 +18,8 @@ jobs:
       max-parallel: 3
       matrix:
         include:
-          - candidate: baseline
-            sha: ada7963246c0c91eae185125a57aecd13cbe0376
-          - candidate: wait-2947
-            sha: e9339e252e225fcb48d58ed806b7735034235f49
-          - candidate: fill-2942
-            sha: 5e68bd1d6f72760bc7fc1a5f99dc0ed313bfbc05
-          - candidate: network-2961
-            sha: 6112ab8a9edf5c7bfdff29df4c185fe8f5c34eb8
+          - candidate: browser-889
+            sha: 321648572c63091ed221961aa81fe6d22b5e30ea
     steps:
       - name: Checkout exact candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
