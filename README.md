@@ -175,6 +175,40 @@ Find the complete list of server parameters (e.g., `--headless`, `--isolated`, `
 
 For basic browser tasks only, the `--slim` flag exposes a reduced set of tools. See the [Slim tool reference][slim-tool-reference].
 
+### Custom browser locations and existing sessions
+
+If Chrome is installed outside the standard locations (for example, by Scoop
+or mise), pass `--executablePath` (`-e`) with the full path to its executable.
+This launches a new browser; it does not connect to an already open window.
+For example, to launch Chromium on Linux, use these MCP client arguments:
+
+```json
+"args": ["-y", "chrome-devtools-mcp@latest", "-e", "/usr/bin/chromium"]
+```
+
+To connect to an existing browser session instead, use `--autoConnect` with
+`--userDataDir` pointing to that browser's user data directory. Enable remote
+debugging in the browser at `chrome://inspect/#remote-debugging` first
+(Chrome 144+ or a Chromium-based browser with this feature). For Chromium on
+Linux, for example:
+
+```json
+"args": [
+  "-y",
+  "chrome-devtools-mcp@latest",
+  "--autoConnect",
+  "--userDataDir",
+  "/home/your-user/.config/chromium"
+]
+```
+
+Replace the example paths with your actual paths. The user data directory is
+the directory containing `DevToolsActivePort`, not a profile subdirectory such
+as `Default`. Without `--userDataDir`, `--autoConnect` looks in the standard
+Chrome user data directory for the selected channel, not Chromium's directory.
+`--executablePath` does not change that lookup and cannot be combined with
+`--autoConnect`. Other Chromium-based browsers are not officially supported.
+
 ## Advanced Usage
 
 For advanced features such as handling concurrent sessions, persistent user data directories, connecting to a running Chrome instance instead of starting a new one, or debugging on Android, see our [Advanced Usage Guide][advanced-usage-guide].

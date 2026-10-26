@@ -5,6 +5,7 @@
  */
 
 import assert from 'node:assert';
+import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {describe, it} from 'node:test';
@@ -655,7 +656,63 @@ describe('browser', () => {
       });
     });
 
-    it('includes remote debugging hint and preserves cause when autoConnect fails without userDataDir', async () => {
+    for (const autoConnect of [true, false]) {
+      it(`does not suggest custom browser paths for unrelated connection errors (autoConnect=${autoConnect})`, async () => {
+        const error = new Error('Connection refused');
+        sinon.stub(puppeteer, 'connect').rejects(error);
+        const manager = new BrowserManager(
+          createMockServerConfig(
+            autoConnect
+              ? {autoConnect: true, channel: 'stable'}
+              : {browserUrl: 'http://127.0.0.1:9222'},
+          ),
+        );
+
+        await assert.rejects(manager.ensureBrowser(), err => {
+          assert.ok(err instanceof Error);
+          assert.strictEqual(
+            err.message,
+            'Could not connect to Chrome. ' +
+              (autoConnect
+                ? 'Check if Chrome is running and remote debugging is enabled ' +
+                  'by going to chrome://inspect/#remote-debugging.'
+                : 'Check if Chrome is running.'),
+          );
+          assert.strictEqual(err.cause, error);
+          return true;
+        });
+      });
+    }
+
+    it('reports the checked path and custom browser hints when DevToolsActivePort is missing with userDataDir', async () => {
+      const userDataDir = path.resolve('custom-chromium');
+      const portPath = path.join(userDataDir, 'DevToolsActivePort');
+      const error = Object.assign(new Error('File not found'), {
+        code: 'ENOENT',
+      });
+      const readFile = sinon.stub(fs.promises, 'readFile').rejects(error);
+      const connect = sinon.stub(puppeteer, 'connect');
+      const manager = new BrowserManager(
+        createMockServerConfig({autoConnect: true, userDataDir}),
+      );
+
+      await assert.rejects(manager.ensureBrowser(), err => {
+        assert.ok(err instanceof Error);
+        assert.ok(err.message.includes(portPath));
+        assert.match(err.message, /--userDataDir/);
+        assert.match(
+          err.message,
+          /--executablePath \(-e\) without --autoConnect/,
+        );
+        assert.match(err.message, /chrome:\/\/inspect\/#remote-debugging/);
+        assert.strictEqual(err.cause, error);
+        return true;
+      });
+      sinon.assert.calledOnceWithExactly(readFile, portPath, 'utf8');
+      sinon.assert.notCalled(connect);
+    });
+
+    it('reports the checked path and custom browser hints when DevToolsActivePort is missing without userDataDir', async () => {
       const enoentError = Object.assign(
         new Error(
           "ENOENT: no such file or directory, open '/Users/test/Library/Application Support/Google/Chrome/DevToolsActivePort'",
@@ -679,7 +736,14 @@ describe('browser', () => {
         assert.ok(err instanceof Error);
         assert.strictEqual(
           err.message,
-          'Could not connect to Chrome. Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.',
+          'Could not connect to Chrome. ' +
+            `${puppeteerError.message}. ` +
+            'Check if Chrome is running and remote debugging is enabled by ' +
+            'going to chrome://inspect/#remote-debugging. ' +
+            'For Chromium or a custom user data directory, pass ' +
+            '--userDataDir with the directory containing DevToolsActivePort. ' +
+            'To launch a browser at a custom executable path instead, use ' +
+            '--executablePath (-e) without --autoConnect.',
         );
         assert.strictEqual(err.cause, puppeteerError);
         return true;

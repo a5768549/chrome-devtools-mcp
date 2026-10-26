@@ -24,6 +24,12 @@ import {
 } from './utils/logger.js';
 import {isAllowedUrl} from './utils/url.js';
 
+const customBrowserHint =
+  'For Chromium or a custom user data directory, pass ' +
+  '--userDataDir with the directory containing DevToolsActivePort. ' +
+  'To launch a browser at a custom executable path instead, use ' +
+  '--executablePath (-e) without --autoConnect.';
+
 export interface BrowserManagerOptions {
   logFile?: fs.WriteStream;
 }
@@ -405,7 +411,11 @@ export class BrowserManager {
           connectOptions.browserWSEndpoint = browserWSEndpoint;
         } catch (error) {
           throw new Error(
-            `Could not connect to Chrome in ${userDataDir}. Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.`,
+            `Could not connect to Chrome in ${userDataDir}. ` +
+              `Could not read a valid DevToolsActivePort at ${portPath}. ` +
+              'Check if Chrome is running and remote debugging is enabled ' +
+              'by going to chrome://inspect/#remote-debugging. ' +
+              customBrowserHint,
             {
               cause: error,
             },
@@ -436,8 +446,18 @@ export class BrowserManager {
       connected.once('disconnected', () => this.#evictIfCurrent(connected));
       return connected;
     } catch (err) {
+      const missingPort =
+        autoConnect &&
+        err instanceof Error &&
+        err.message.startsWith('Could not find DevToolsActivePort');
       throw new Error(
-        `Could not connect to Chrome. ${autoConnect ? `Check if Chrome is running and remote debugging is enabled by going to chrome://inspect/#remote-debugging.` : `Check if Chrome is running.`}`,
+        'Could not connect to Chrome. ' +
+          (missingPort ? `${err.message}. ` : '') +
+          (autoConnect
+            ? 'Check if Chrome is running and remote debugging is enabled ' +
+              'by going to chrome://inspect/#remote-debugging.'
+            : 'Check if Chrome is running.') +
+          (missingPort ? ` ${customBrowserHint}` : ''),
         {
           cause: err,
         },
